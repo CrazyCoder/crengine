@@ -5629,10 +5629,10 @@ CRPropRef LVDocView::propsApply(CRPropRef props) {
 			bool embolden = props->getBoolDef(PROP_FONT_WEIGHT_EMBOLDEN, false);
 			int v = embolden ? STYLE_FONT_EMBOLD_MODE_EMBOLD
 					: STYLE_FONT_EMBOLD_MODE_NORMAL;
-			if (v != LVRendGetFontEmbolden()) {
+			//if (v != LVRendGetFontEmbolden()) {
 				LVRendSetFontEmbolden(v);
                 REQUEST_RENDER("propsApply - embolden")
-			}
+			//}
 		} else if (name == PROP_TXT_OPTION_PREFORMATTED) {
 			bool preformatted = props->getBoolDef(PROP_TXT_OPTION_PREFORMATTED,
 					false);
