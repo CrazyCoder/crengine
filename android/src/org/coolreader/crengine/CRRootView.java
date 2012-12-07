@@ -13,6 +13,7 @@ import org.coolreader.plugins.OnlineStorePluginManager;
 import org.coolreader.plugins.OnlineStoreWrapper;
 import org.coolreader.plugins.litres.LitresPlugin;
 
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -53,10 +54,61 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
     	w = h * 3 / 4;
     	coverWidth = w;
     	coverHeight = h;
+    	setFocusable(true);
+    	setFocusableInTouchMode(true);
 		createViews();
 		
 	}
 	
+	
+	
+	private long menuDownTs = 0;
+	private long backDownTs = 0;
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+			//L.v("CRRootView.onKeyDown(" + keyCode + ")");
+			if (event.getRepeatCount() == 0)
+				menuDownTs = Utils.timeStamp();
+			return true;
+		}
+		if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+			//L.v("CRRootView.onKeyDown(" + keyCode + ")");
+			if (event.getRepeatCount() == 0)
+				backDownTs = Utils.timeStamp();
+			return true;
+		}
+		return super.onKeyDown(keyCode, event);
+	}
+
+	@Override
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+			long duration = Utils.timeInterval(menuDownTs);
+			L.v("CRRootView.onKeyUp(" + keyCode + ") duration = " + duration);
+			if (duration > 700 && duration < 10000)
+				mActivity.showBrowserOptionsDialog();
+			else
+				showMenu();
+			return true;
+		}
+		if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+			long duration = Utils.timeInterval(backDownTs);
+			L.v("CRRootView.onKeyUp(" + keyCode + ") duration = " + duration);
+			if (duration > 700 && duration < 10000 || !mActivity.isBookOpened()) {
+				mActivity.finish();
+				return true;
+			} else {
+				mActivity.showReader();
+				return true;
+			}
+		}
+		return super.onKeyUp(keyCode, event);
+	}
+
+
+
 	private InterfaceTheme lastTheme;
 	public void onThemeChange(InterfaceTheme theme) {
 		if (lastTheme != theme) {
@@ -197,13 +249,17 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 	}
 
 	public void refreshOnlineCatalogs() {
-		if (mActivity.getDB() != null)
-			mActivity.getDB().loadOPDSCatalogs(new OPDSCatalogsLoadingCallback() {
-				@Override
-				public void onOPDSCatalogsLoaded(ArrayList<FileInfo> catalogs) {
-					updateOnlineCatalogs(catalogs);
-				}
-			});
+		mActivity.waitForCRDBService(new Runnable() {
+			@Override
+			public void run() {
+				mActivity.getDB().loadOPDSCatalogs(new OPDSCatalogsLoadingCallback() {
+					@Override
+					public void onOPDSCatalogsLoaded(ArrayList<FileInfo> catalogs) {
+						updateOnlineCatalogs(catalogs);
+					}
+				});
+			}
+		});
 	}
 	
 	ArrayList<FileInfo> lastCatalogs = new ArrayList<FileInfo>();
@@ -218,9 +274,9 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 			opdsRoot.addItems(catalogs);
 		catalogs.add(opdsRoot);
 		
-		if (lastCatalogs.equals(catalogs)) {
-			return; // not changed
-		}
+//		if (lastCatalogs.equals(catalogs)) {
+//			return; // not changed
+//		}
 		lastCatalogs = catalogs;
 		
 		LayoutInflater inflater = LayoutInflater.from(mActivity);
@@ -330,9 +386,11 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 			ImageView icon = (ImageView)view.findViewById(R.id.item_icon);
 			TextView label = (TextView)view.findViewById(R.id.item_name);
 			if (i == dirs.size() - 1)
-				icon.setImageResource(R.drawable.cr3_browser_folder_user);
+				icon.setImageResource(R.drawable.folder_bookmark);
+			else if (label.getText().toString().indexOf("sd") >= 0)
+				icon.setImageResource(R.drawable.media_flash_sd_mmc);
 			else
-				icon.setImageResource(R.drawable.cr3_browser_folder_database);
+				icon.setImageResource(R.drawable.folder_blue);
 			label.setText(item.pathname);
 			label.setMaxWidth(coverWidth * 25 / 10);
 			view.setOnClickListener(new OnClickListener() {
@@ -489,8 +547,8 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 		
 		removeAllViews();
 		addView(mView);
-		setFocusable(false);
-		setFocusableInTouchMode(false);
+		//setFocusable(false);
+		//setFocusableInTouchMode(false);
 //		requestFocus();
 //		setOnTouchListener(new OnTouchListener() {
 //			@Override
@@ -551,6 +609,9 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 
 	public void showMenu() {
 		ReaderAction[] actions = {
+			ReaderAction.ABOUT,
+			ReaderAction.CURRENT_BOOK,
+			ReaderAction.RECENT_BOOKS,
 			ReaderAction.USER_MANUAL,
 			ReaderAction.OPTIONS,
 			ReaderAction.EXIT,	
@@ -560,6 +621,15 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 			public boolean onActionSelected(ReaderAction item) {
 				if (item == ReaderAction.EXIT) {
 					mActivity.finish();
+					return true;
+				} else if (item == ReaderAction.ABOUT) {
+					mActivity.showAboutDialog();
+					return true;
+				} else if (item == ReaderAction.RECENT_BOOKS) {
+					mActivity.showRecentBooks();
+					return true;
+				} else if (item == ReaderAction.CURRENT_BOOK) {
+					mActivity.showCurrentBook();
 					return true;
 				} else if (item == ReaderAction.USER_MANUAL) {
 					mActivity.showManual();
@@ -572,5 +642,7 @@ public class CRRootView extends ViewGroup implements CoverpageReadyListener {
 			}
 		});
 	}
+
+	
 	
 }

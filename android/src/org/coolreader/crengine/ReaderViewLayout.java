@@ -108,6 +108,7 @@ public class ReaderViewLayout extends ViewGroup implements Settings {
 				ReaderAction.OPEN_PREVIOUS_BOOK,
 				ReaderAction.TOGGLE_AUTOSCROLL,
 				ReaderAction.TOGGLE_DAY_NIGHT,
+				ReaderAction.TOGGLE_SELECTION_MODE,
 				ReaderAction.ABOUT,
 				ReaderAction.EXIT,
 			}), false);
