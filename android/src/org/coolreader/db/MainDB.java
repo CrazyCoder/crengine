@@ -15,6 +15,7 @@ import org.coolreader.crengine.FileInfo;
 import org.coolreader.crengine.L;
 import org.coolreader.crengine.Logger;
 import org.coolreader.crengine.MountPathCorrector;
+import org.coolreader.crengine.OPDSConst;
 import org.coolreader.crengine.Utils;
 
 import android.database.Cursor;
@@ -28,7 +29,7 @@ public class MainDB extends BaseDB {
 	public static final Logger vlog = L.create("mdb", Log.VERBOSE);
 	
 	private boolean pathCorrectionRequired = false;
-	public final int DB_VERSION = 15;
+	public final int DB_VERSION = 20;
 	@Override
 	protected boolean upgradeSchema() {
 		if (mDB.needUpgrade(DB_VERSION)) {
@@ -97,7 +98,8 @@ public class MainDB extends BaseDB {
 					"end_pos VARCHAR," +
 					"title_text VARCHAR," +
 					"pos_text VARCHAR," +
-					"comment_text VARCHAR" +
+					"comment_text VARCHAR, " +
+					"time_elapsed INTEGER DEFAULT 0" +
 					")");
 			execSQL("CREATE INDEX IF NOT EXISTS " +
 			"bookmark_book_index ON bookmark (book_fk) ");
@@ -111,12 +113,11 @@ public class MainDB extends BaseDB {
 				execSQL("CREATE TABLE IF NOT EXISTS opds_catalog (" +
 						"id INTEGER PRIMARY KEY AUTOINCREMENT, " +
 						"name VARCHAR NOT NULL COLLATE NOCASE, " +
-						"url VARCHAR NOT NULL COLLATE NOCASE" +
+						"url VARCHAR NOT NULL COLLATE NOCASE, " +
+						"last_usage INTEGER DEFAULT 0" +
 						")");
 			if (currentVersion < 7) {
 				addOPDSCatalogs(DEF_OPDS_URLS1);
-				if (!DeviceInfo.NOFLIBUSTA)
-					addOPDSCatalogs(DEF_OPDS_URLS1A);
 			}
 			if (currentVersion < 8)
 				addOPDSCatalogs(DEF_OPDS_URLS2);
@@ -126,6 +127,12 @@ public class MainDB extends BaseDB {
 				pathCorrectionRequired = true;
 			if (currentVersion < 15)
 			    execSQLIgnoreErrors("ALTER TABLE opds_catalog ADD COLUMN last_usage INTEGER DEFAULT 0");
+			if (currentVersion < 16)
+				execSQLIgnoreErrors("ALTER TABLE bookmark ADD COLUMN time_elapsed INTEGER DEFAULT 0");
+			if (currentVersion < 17)
+				pathCorrectionRequired = true; // chance to correct paths under Android 4.2
+			if (currentVersion < 20)
+				removeOPDSCatalogsFromBlackList(); // BLACK LIST enforcement, by LitRes request
 
 			//==============================================================
 			// add more updates above this line
@@ -202,10 +209,6 @@ public class MainDB extends BaseDB {
 		"http://www.ebooksgratuits.com/opds/", "Ebooks libres et gratuits",
 	};
 
-	private final static String[] DEF_OPDS_URLS1A = {
-		"http://flibusta.net/opds/", "Flibusta", 
-	};
-	
 	private final static String[] DEF_OPDS_URLS2 = {
 		"http://www.shucang.org/s/index.php", "ShuCang.org",
 	};
@@ -218,6 +221,16 @@ public class MainDB extends BaseDB {
 		}
 	}
 
+	public void removeOPDSCatalogsFromBlackList() {
+		if (OPDSConst.BLACK_LIST_MODE != OPDSConst.BLACK_LIST_MODE_FORCE) {
+		    execSQLIgnoreErrors("DELETE FROM opds_catalog WHERE url='http://flibusta.net/opds/'");
+		} else {
+			for (String url : OPDSConst.BLACK_LIST) {
+			    execSQLIgnoreErrors("DELETE FROM opds_catalog WHERE url=" + quoteSqlString(url));
+			}
+		}
+	}
+	
 	public void updateOPDSCatalogLastUsage(String url) {
 		try {
 			Long existingIdByUrl = longQuery("SELECT id FROM opds_catalog WHERE url=" + quoteSqlString(url));
@@ -317,7 +330,7 @@ public class MainDB extends BaseDB {
 	private static final String READ_BOOKMARK_SQL = 
 		"SELECT " +
 		"id, type, percent, shortcut, time_stamp, " + 
-		"start_pos, end_pos, title_text, pos_text, comment_text " +
+		"start_pos, end_pos, title_text, pos_text, comment_text, time_elapsed " +
 		"FROM bookmark b ";
 	private void readBookmarkFromCursor( Bookmark v, Cursor rs )
 	{
@@ -332,6 +345,7 @@ public class MainDB extends BaseDB {
 		v.setTitleText( rs.getString(i++) );
 		v.setPosText( rs.getString(i++) );
 		v.setCommentText( rs.getString(i++) );
+		v.setTimeElapsed( rs.getLong(i++) );
 	}
 
 	public boolean findBy( Bookmark v, String condition ) {
@@ -1234,6 +1248,7 @@ public class MainDB extends BaseDB {
 			add("pos_text", newValue.getPosText(), oldValue.getPosText());
 			add("comment_text", newValue.getCommentText(), oldValue.getCommentText());
 			add("time_stamp", newValue.getTimeStamp(), oldValue.getTimeStamp());
+			add("time_elapsed", newValue.getTimeElapsed(), oldValue.getTimeElapsed());
 		}
 	}
 

@@ -13,7 +13,7 @@
 
 /// change in case of incompatible changes in swap/cache file format to avoid using incompatible swap file
 // increment to force complete reload/reparsing of old file
-#define CACHE_FILE_FORMAT_VERSION "3.04.36"
+#define CACHE_FILE_FORMAT_VERSION "3.04.37"
 /// increment following value to force re-formatting of old book after load
 #define FORMATTING_VERSION_ID 0x0003
 
@@ -69,7 +69,7 @@
 //#define TRACE_AUTOBOX
 /// set to 1 to enable crc check of all blocks of cache file on open
 #ifndef ENABLE_CACHE_FILE_CONTENTS_VALIDATION
-#define ENABLE_CACHE_FILE_CONTENTS_VALIDATION 0
+#define ENABLE_CACHE_FILE_CONTENTS_VALIDATION 1
 #endif
 
 #define RECT_DATA_CHUNK_ITEMS_SHIFT 11
@@ -148,6 +148,11 @@ enum CacheFileBlockType {
 // define to store new text nodes as persistent text, instead of mutable
 #define USE_PERSISTENT_TEXT 1
 
+
+static bool _enableCacheFileContentsValidation = (bool)ENABLE_CACHE_FILE_CONTENTS_VALIDATION;
+void enableCacheFileContentsValidation(bool enable) {
+	_enableCacheFileContentsValidation = enable;
+}
 
 static int _nextDocumentIndex = 0;
 ldomDocument * ldomNode::_documentInstances[MAX_DOCUMENT_INSTANCE_COUNT] = {NULL,};
@@ -997,12 +1002,10 @@ bool CacheFile::open( LVStreamRef stream )
         CRLog::error("CacheFile::open : cannot read index from file");
         return false;
     }
-#if ENABLE_CACHE_FILE_CONTENTS_VALIDATION==1
-    if ( !validateContents() ) {
+    if (_enableCacheFileContentsValidation && !validateContents() ) {
         CRLog::error("CacheFile::open : file contents validation failed");
         return false;
     }
-#endif
     return true;
 }
 

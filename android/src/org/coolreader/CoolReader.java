@@ -35,7 +35,6 @@ import org.coolreader.crengine.ReaderViewLayout;
 import org.coolreader.crengine.Services;
 import org.coolreader.crengine.TTS;
 import org.coolreader.crengine.TTS.OnTTSCreatedListener;
-import org.coolreader.crengine.Utils;
 import org.coolreader.donations.BillingService;
 import org.coolreader.donations.BillingService.RequestPurchase;
 import org.coolreader.donations.BillingService.RestoreTransactions;
@@ -59,11 +58,9 @@ import android.os.Bundle;
 import android.os.Debug;
 import android.os.Handler;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 
 public class CoolReader extends BaseActivity
 {
@@ -85,17 +82,12 @@ public class CoolReader extends BaseActivity
 	
 	String fileToLoadOnStart = null;
 	
-	private String mVersion = "3.0";
-	
-	public String getVersion() {
-		return mVersion;
-	}
-	
 	private boolean isFirstStart = true;
 	int initialBatteryState = -1;
 	BroadcastReceiver intentReceiver;
 
-	private boolean justCreated = false; 
+	private boolean justCreated = false;
+	
 	
 	/** Called when the activity is first created. */
     @Override
@@ -114,6 +106,10 @@ public class CoolReader extends BaseActivity
 		log.i("CoolReader.onCreate() entered");
 		super.onCreate(savedInstanceState);
 
+		
+		
+		
+		
 		// apply settings
     	onSettingsChanged(settings(), null);
 
@@ -534,6 +530,12 @@ public class CoolReader extends BaseActivity
 			});
 		}
 		
+		
+		if ( isBookOpened() ) {
+			showOpenedBook();
+			return;
+		}
+		
 		if (!isFirstStart)
 			return;
 		isFirstStart = false;
@@ -889,13 +891,16 @@ public class CoolReader extends BaseActivity
 		//getWindow().setBackgroundDrawable(theme.getActionBarBackgroundDrawableBrowser());
 	}
 
-	public void directoryUpdated(FileInfo dir) {
+	public void directoryUpdated(FileInfo dir, FileInfo selected) {
 		if (dir.isOPDSRoot())
 			mHomeFrame.refreshOnlineCatalogs();
 		else if (dir.isRecentDir())
 			mHomeFrame.refreshRecentBooks();
 		if (mBrowser != null)
-			mBrowser.refreshDirectory(dir);
+			mBrowser.refreshDirectory(dir, selected);
+	}
+	public void directoryUpdated(FileInfo dir) {
+		directoryUpdated(dir, null);
 	}
 	
 	public void onSettingsChanged(Properties props, Properties oldProps) {
@@ -947,7 +952,7 @@ public class CoolReader extends BaseActivity
 			}
 			if (mCurrentFrame == mBrowserFrame) {
 				// update recent books directory
-				mBrowser.refreshDirectory(Services.getScanner().getRecentDir());
+				mBrowser.refreshDirectory(Services.getScanner().getRecentDir(), null);
 			}
 			onUserActivity();
 		}
@@ -982,7 +987,8 @@ public class CoolReader extends BaseActivity
 			        mReaderFrame.getToolBar().setOnActionHandler(new OnActionHandler() {
 						@Override
 						public boolean onActionSelected(ReaderAction item) {
-							mReaderView.onAction(item);
+							if (mReaderView != null)
+								mReaderView.onAction(item);
 							return true;
 						}
 					});
@@ -1194,18 +1200,19 @@ public class CoolReader extends BaseActivity
 	
 	public void findInDictionary( String s ) {
 		if ( s!=null && s.length()!=0 ) {
-			s = s.trim();
-			for ( ;s.length()>0; ) {
-				char ch = s.charAt(s.length()-1);
-				if ( ch>=128 )
-					break;
-				if ( ch>='0' && ch<='9' || ch>='A' && ch<='Z' || ch>='a' && ch<='z' )
-					break;
-				s = s.substring(0, s.length()-1);
-			}
-			if ( s.length()>0 ) {
-				//
-				final String pattern = s;
+			int start,end;
+			
+			// Skip over non-letter characters at the beginning and end of the search string
+			for (start = 0 ;start<s.length(); start++)
+				if (Character.isLetterOrDigit(s.charAt(start)))
+ 					break;
+			for (end=s.length()-1; end>=start; end--)
+				if (Character.isLetterOrDigit(s.charAt(end)))
+ 					break;
+
+			if ( end > start ) {
+    			final String pattern = s.substring(start,end+1);
+
 				BackgroundThread.instance().postBackground(new Runnable() {
 					@Override
 					public void run() {
@@ -1800,6 +1807,9 @@ public class CoolReader extends BaseActivity
 	 */
 	public void setLastLocation(String location) {
 		try {
+			String oldLocation = getPrefs().getString(PREF_LAST_LOCATION, null);
+			if (oldLocation != null && oldLocation.equals(location))
+				return; // not changed
 	        SharedPreferences.Editor editor = getPrefs().edit();
 	        editor.putString(PREF_LAST_LOCATION, location);
 	        editor.commit();
@@ -1838,6 +1848,8 @@ public class CoolReader extends BaseActivity
 	
 	public void notification1()
 	{
+		if (hasHardwareMenuKey())
+			return; // don't show notice if hard key present
 		showNotice(R.string.note1_reader_menu, new Runnable() {
 			@Override
 			public void run() {
@@ -1858,6 +1870,18 @@ public class CoolReader extends BaseActivity
 	 */
 	private String getLastLocation() {
         String res = getPrefs().getString(PREF_LAST_LOCATION, null);
+        if (res == null) {
+    		// import last book value from previous releases 
+        	res = getPrefs().getString(PREF_LAST_BOOK, null);
+        	if (res != null) {
+        		res = BOOK_LOCATION_PREFIX + res;
+        		try {
+        			getPrefs().edit().remove(PREF_LAST_BOOK).commit();
+        		} catch (Exception e) {
+        			// ignore
+        		}
+        	}
+        }
         log.i("getLastLocation() = " + res);
         return res;
 	}

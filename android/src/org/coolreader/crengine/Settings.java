@@ -148,7 +148,7 @@ public interface Settings {
     
     public static final String PROP_APP_STARTUP_ACTION = "app.startup.action";
 
-    public static final String PROP_APP_PLUGIN_ENABLED = "app.plugin.enabled";
+    public static final String PROP_APP_PLUGIN_ENABLED = "app.plugin.enabled.litres";
     
 
     // available options for PROP_APP_SELECTION_ACTION setting
@@ -203,6 +203,7 @@ public interface Settings {
     	HU("hu", R.string.options_app_locale_hu, R.raw.help_template_hu),
     	NL("nl", R.string.options_app_locale_nl, 0),
     	PL("pl", R.string.options_app_locale_pl, 0),
+    	CS("cs", R.string.options_app_locale_cs, 0),
     	ZH_CN("zh_CN", R.string.options_app_locale_zh_cn, R.raw.help_template_zh_cn),
     	;
     	
@@ -279,11 +280,14 @@ public interface Settings {
 	    PROP_HIGHLIGHT_BOOKMARK_COLOR_COMMENT + "*",
 	    PROP_HIGHLIGHT_BOOKMARK_COLOR_CORRECTION + "*",
 
+      "viewer.*",
 	    PROP_APP_VIEW_AUTOSCROLL_SPEED,
 	    PROP_APP_VIEW_AUTOSCROLL_TYPE,
-	    
+	    	    
+      "app.key.*",
 	    "app.tapzone.*",
 	    PROP_APP_DOUBLE_TAP_SELECTION,
+	    "app.touch.*",
 
 	    "app.ui.theme*",
 	};

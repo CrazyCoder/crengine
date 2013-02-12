@@ -243,7 +243,12 @@ public class FileBrowser extends LinearLayout implements FileInfoChangeListener 
 		mListView.setOnTouchListener(new ListView.OnTouchListener() {
 			@Override
 			public boolean onTouch(View v, MotionEvent event) {
-				return detector.onTouchEvent(event);
+				try {
+					return detector.onTouchEvent(event);
+				} catch (Exception e) {
+					L.e("Exception in onTouch", e);
+					return false;
+				}
 			}
 		});
 		if (currentListAdapter == null || recreateAdapter) {
@@ -347,13 +352,13 @@ public class FileBrowser extends LinearLayout implements FileInfoChangeListener 
 		}
 	}
 	
-	public void refreshDirectory(FileInfo dir) {
+	public void refreshDirectory(FileInfo dir, FileInfo selected) {
 		if (dir.isSpecialDir()) {
 			if (dir.isOPDSRoot())
 				refreshOPDSRootDirectory(false);
 		} else {
 			if (dir.pathNameEquals(currDirectory))
-				showDirectory(currDirectory, null);
+				showDirectory(currDirectory, selected);
 		}
 	}
 
@@ -1130,7 +1135,7 @@ public class FileBrowser extends LinearLayout implements FileInfoChangeListener 
 						String seriesName = Utils.formatSeries(item.series, item.seriesNumber);
 						String title = item.title;
 						String filename1 = item.filename;
-						String filename2 = item.isArchive /*&& !item.isDirectory */
+						String filename2 = item.isArchive && item.arcname != null /*&& !item.isDirectory */
 								? new File(item.arcname).getName() : null;
 								
 						String onlineBookInfo = "";
@@ -1158,10 +1163,10 @@ public class FileBrowser extends LinearLayout implements FileInfoChangeListener 
 //						field3.setVisibility(VISIBLE);
 						String state = Utils.formatReadingState(mActivity, item);
 						if (field1 != null)
-							field1.setText(onlineBookInfo + "  " + state + " " + Utils.formatFileInfo(item));
+							field1.setText(onlineBookInfo + "  " + state + " " + Utils.formatFileInfo(mActivity, item));
 						//field2.setText(formatDate(pos!=null ? pos.getTimeStamp() : item.createTime));
 						if (field2 != null)
-							field2.setText(Utils.formatLastPosition(mHistory.getLastPos(item)));
+							field2.setText(Utils.formatLastPosition(mActivity, mHistory.getLastPos(item)));
 						//field3.setText(pos!=null ? formatPercent(pos.getPercent()) : null);
 					} 
 					
@@ -1265,7 +1270,7 @@ public class FileBrowser extends LinearLayout implements FileInfoChangeListener 
 		BackgroundThread.ensureGUI();
 		setCurrDirectory(dir);
 		
-		if ( dir!=null ) {
+		if (dir!=null && dir != currDirectory) {
 			log.i("Showing directory " + dir + " " + Thread.currentThread().getName());
 			if (dir.isRecentDir())
 				mActivity.setLastLocation(dir.getPathName());
@@ -1278,12 +1283,14 @@ public class FileBrowser extends LinearLayout implements FileInfoChangeListener 
 		if ( dir!=null && !dir.isRootDir() )
 			index++;
 		
-		String title = dir.filename;
-		if (!dir.isSpecialDir())
-			title = dir.getPathName();
-		if (dir.isOnlineCatalogPluginDir())
-			title = translateOnlineStorePluginItem(dir);
-		
+		String title = "";
+		if (dir != null) {
+			title = dir.filename;
+			if (!dir.isSpecialDir())
+				title = dir.getPathName();
+			if (dir.isOnlineCatalogPluginDir())
+				title = translateOnlineStorePluginItem(dir);
+		}
 		
 		mActivity.setBrowserTitle(title);
 		

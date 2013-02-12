@@ -43,9 +43,11 @@ import android.view.MenuItem;
 import android.view.MenuItem.OnMenuItemClickListener;
 import android.view.View;
 import android.view.View.OnCreateContextMenuListener;
+import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class BaseActivity extends Activity implements Settings {
@@ -259,7 +261,7 @@ public class BaseActivity extends Activity implements Settings {
 	
 	public boolean isStarted() { return mIsStarted; }
 	
-	private String mVersion = "3.0";
+	private String mVersion = "3.1";
 	
 	public String getVersion() {
 		return mVersion;
@@ -1111,7 +1113,12 @@ public class BaseActivity extends Activity implements Settings {
 
 	public void askConfirmation(int questionResourceId, final Runnable action, final Runnable cancelAction) {
 		AlertDialog.Builder dlg = new AlertDialog.Builder(this);
-		dlg.setTitle(questionResourceId);
+		
+		final TextView myView = new TextView(getApplicationContext());
+		myView.setText(questionResourceId);
+		//myView.setTextSize(12);
+		dlg.setView(myView);
+		//dlg.setTitle(questionResourceId);
 		dlg.setPositiveButton(R.string.dlg_button_ok, new OnClickListener() {
 			public void onClick(DialogInterface arg0, int arg1) {
 				action.run();
@@ -1422,7 +1429,7 @@ public class BaseActivity extends Activity implements Settings {
 	        return res;
 		}
 		
-		public Properties loadSettings(File file) {
+		public Properties loadSettings(BaseActivity activity, File file) {
 	        Properties props = new Properties();
 
 	        if ( file.exists() && !DEBUG_RESET_OPTIONS ) {
@@ -1436,14 +1443,26 @@ public class BaseActivity extends Activity implements Settings {
 	        }
 	        
 	        // default key actions
+          boolean menuKeyActionFound = false;
 	        for ( DefKeyAction ka : DEF_KEY_ACTIONS ) {
 	        		props.applyDefault(ka.getProp(), ka.action.id);
+	        		if (ReaderAction.READER_MENU.id.equals(ka.action.id))
+	        		  menuKeyActionFound = true;
 	        }
-	        // default tap zone actions
+
+	        boolean menuTapActionFound = false;
+	        for ( DefTapAction ka : DEF_TAP_ACTIONS ) {
+	        	String paramName = ka.longPress ? ReaderView.PROP_APP_TAP_ZONE_ACTIONS_TAP + ".long." + ka.zone : ReaderView.PROP_APP_TAP_ZONE_ACTIONS_TAP + "." + ka.zone;
+	        	String value = props.getProperty(paramName);
+	        	if (ReaderAction.READER_MENU.id.equals(value))
+	        		menuTapActionFound = true;
+	        }
+
+          // default tap zone actions
 	        for ( DefTapAction ka : DEF_TAP_ACTIONS ) {
 	        	String paramName = ka.longPress ? ReaderView.PROP_APP_TAP_ZONE_ACTIONS_TAP + ".long." + ka.zone : ReaderView.PROP_APP_TAP_ZONE_ACTIONS_TAP + "." + ka.zone;
 	        	
-	        	if (ka.zone == 5 && ((DeviceInfo.getSDKLevel() >= DeviceInfo.HONEYCOMB) || (DeviceInfo.EINK_SCREEN))) {
+	        	if (ka.zone == 5 && !activity.hasHardwareMenuKey() && !menuTapActionFound && !menuKeyActionFound) {
 	        		// force assignment of central tap zone
 	        		props.setProperty(paramName, ka.action.id);
 	        	} else {
@@ -1451,7 +1470,7 @@ public class BaseActivity extends Activity implements Settings {
 	        	}
 	        }
 	        
-	        if ( DeviceInfo.EINK_SCREEN ) {
+	        if (DeviceInfo.EINK_NOOK) {
 	    		props.applyDefault(ReaderView.PROP_PAGE_ANIMATION, ReaderView.PAGE_ANIMATION_NONE);
 	        } else {
 	    		props.applyDefault(ReaderView.PROP_PAGE_ANIMATION, ReaderView.PAGE_ANIMATION_SLIDE2);
@@ -1631,7 +1650,7 @@ public class BaseActivity extends Activity implements Settings {
 				}
 	        }
 	        
-	        Properties props = loadSettings(propsFile);
+	        Properties props = loadSettings(mActivity, propsFile);
 
 			return props;
 		}
@@ -1640,7 +1659,7 @@ public class BaseActivity extends Activity implements Settings {
 			File f = getSettingsFile(profile);
 			if (!f.exists() && profile != 0)
 				f = getSettingsFile(0);
-			Properties res = loadSettings(f);
+			Properties res = loadSettings(mActivity, f);
 			if (profile != 0) {
 				res = filterProfileSettings(res);
 				res.setInt(Settings.PROP_PROFILE_NUMBER, profile);
@@ -1755,4 +1774,39 @@ public class BaseActivity extends Activity implements Settings {
             return false;
         }
     }
+
+	private Boolean hasHardwareMenuKey = null;
+	
+	public boolean hasHardwareMenuKey() {
+		if (hasHardwareMenuKey == null) {
+			ViewConfiguration vc = ViewConfiguration.get(this);
+			if (DeviceInfo.getSDKLevel() >= 14) {
+				//boolean vc.hasPermanentMenuKey();
+				try {
+					Method m = vc.getClass().getMethod("hasPermanentMenuKey", new Class<?>[] {});
+					try {
+						hasHardwareMenuKey = (Boolean)m.invoke(vc, new Object[] {});
+					} catch (IllegalArgumentException e) {
+						hasHardwareMenuKey = false;
+					} catch (IllegalAccessException e) {
+						hasHardwareMenuKey = false;
+					} catch (InvocationTargetException e) {
+						hasHardwareMenuKey = false;
+					}
+				} catch (NoSuchMethodException e) {
+					hasHardwareMenuKey = false;
+				}
+			}
+			if (hasHardwareMenuKey == null) {
+				if (DeviceInfo.EINK_SCREEN)
+					hasHardwareMenuKey = false;			
+				else if (DeviceInfo.getSDKLevel() < DeviceInfo.ICE_CREAM_SANDWICH)
+					hasHardwareMenuKey = true;
+				else
+					hasHardwareMenuKey = false;			
+			}
+		}
+		return hasHardwareMenuKey;
+	}
+	
 }

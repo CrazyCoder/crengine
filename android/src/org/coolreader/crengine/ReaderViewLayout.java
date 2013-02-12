@@ -69,19 +69,21 @@ public class ReaderViewLayout extends ViewGroup implements Settings {
 						activity.getReaderView().onAction(item);
 						return true;
 					}
-				}, new OnOverflowHandler() {
-					@Override
-					public boolean onOverflowActions(ArrayList<ReaderAction> actions) {
-						activity.showActionsPopupMenu(actions, new OnActionHandler() {
-							@Override
-							public boolean onActionSelected(ReaderAction item) {
-								activity.getReaderView().onAction(item);
-								return true;
-							}
-						});
-						return false;
-					}
-				});
+				}, null);
+//			new OnOverflowHandler() {
+//					@Override
+//					public boolean onOverflowActions(ArrayList<ReaderAction> actions) {
+//						toolbarView.showOverflowMenu();
+////						activity.showActionsPopupMenu(actions, new OnActionHandler() {
+////							@Override
+////							public boolean onActionSelected(ReaderAction item) {
+////								activity.getReaderView().onAction(item);
+////								return true;
+////							}
+////						});
+//						return false;
+//					}
+//				});
 		}
 		
 		public ReaderViewLayout(CoolReader context, ReaderView contentView) {
@@ -99,6 +101,8 @@ public class ReaderViewLayout extends ViewGroup implements Settings {
 				ReaderAction.OPTIONS,
 				ReaderAction.BOOKMARKS,
 				ReaderAction.FILE_BROWSER_ROOT,
+				ReaderAction.TOGGLE_DAY_NIGHT,
+				ReaderAction.TOGGLE_SELECTION_MODE,
 				ReaderAction.GO_PAGE,
 				ReaderAction.GO_PERCENT,
 				ReaderAction.FILE_BROWSER,
@@ -107,8 +111,6 @@ public class ReaderViewLayout extends ViewGroup implements Settings {
 				ReaderAction.RECENT_BOOKS,
 				ReaderAction.OPEN_PREVIOUS_BOOK,
 				ReaderAction.TOGGLE_AUTOSCROLL,
-				ReaderAction.TOGGLE_DAY_NIGHT,
-				ReaderAction.TOGGLE_SELECTION_MODE,
 				ReaderAction.ABOUT,
 				ReaderAction.EXIT,
 			}), false);

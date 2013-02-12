@@ -408,6 +408,7 @@
     <string name="options_app_locale">Interface language</string>
     <string name="options_app_locale_bg">Български</string>
     <string name="options_app_locale_de">Deutsch</string>
+    <string name="options_app_locale_cs">Czech</string>
     <string name="options_app_locale_en">English</string>
     <string name="options_app_locale_es">Español</string>
     <string name="options_app_locale_fr">Français</string>
@@ -502,4 +503,6 @@
     <string name="root_item_library">Browse library</string>
     <string name="root_item_filesystem">Browse file system</string>
     <string name="root_item_online_catalogs">Online catalogs</string>
+    <string name="black_list_enforced">Cannot add this URL since it is added to black list of catalogs which may violate DMCA by request of LitRes.ru</string>
+    <string name="black_list_warning">WARNING: this URL is added to black list of catalogs which may violate DMCA by request of LitRes.ru Do you really want to add this catalog?</string>
 </resources>

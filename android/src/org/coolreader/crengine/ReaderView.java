@@ -81,6 +81,8 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
     public static final int SEL_CMD_NEXT_SENTENCE = 2;
     public static final int SEL_CMD_PREV_SENTENCE = 3;
     
+    // Double tap selections within this radius are are assumed to be attempts to select a single point 
+    public static final int DOUBLE_TAP_RADIUS = 60;
     
     public enum ViewMode
     {
@@ -465,6 +467,54 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 //	boolean VOLUME_KEYS_ZOOM = false;
 	
 	//private boolean backKeyDownHere = false;
+
+
+	private long statStartTime;
+	private long statTimeElapsed;
+
+	public void startStats() {
+		if (statStartTime == 0) {
+			statStartTime = android.os.SystemClock.uptimeMillis();
+			log.d("stats: started reading");
+		}
+	}
+
+	public void stopStats() {
+		if (statStartTime > 0) {
+			statTimeElapsed += android.os.SystemClock.uptimeMillis() - statStartTime;
+			statStartTime = 0;
+			log.d("stats: stopped reading");
+		}
+	}
+
+	public long getTimeElapsed() {
+		if (statStartTime > 0)
+			return statTimeElapsed + android.os.SystemClock.uptimeMillis() - statStartTime;
+		else
+			return statTimeElapsed++;
+	}
+
+	public void setTimeElapsed(long timeElapsed) {
+		statTimeElapsed = timeElapsed;
+	}
+
+	@Override
+	public void onWindowVisibilityChanged(int visibility) {
+		if (visibility == VISIBLE)
+			startStats();
+		else
+			stopStats();
+		super.onWindowVisibilityChanged(visibility);
+	}
+	 	
+	@Override
+	public void onWindowFocusChanged(boolean hasWindowFocus) {
+		if (hasWindowFocus)
+			startStats();
+		else
+			stopStats();
+		super.onWindowFocusChanged(hasWindowFocus);
+	}
 	
 	@Override
 	protected void onFocusChanged(boolean gainFocus, int direction,
@@ -1348,7 +1398,11 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 					state = STATE_DONE;
 					return cancel();
 				case STATE_SELECTION:
-					updateSelection( start_x, start_y, x, y, true );
+					// If the second tap is within a radius of the first tap point, assume the user is trying to double tap on the same point 
+					if ( start_x-x <= DOUBLE_TAP_RADIUS && x-start_x <= DOUBLE_TAP_RADIUS && y-start_y <= DOUBLE_TAP_RADIUS && start_y-y <= DOUBLE_TAP_RADIUS )
+						updateSelection( start_x, start_y, start_x, start_y, true );
+					else
+						updateSelection( start_x, start_y, x, y, true );
 					selectionModeActive = false;
 					state = STATE_DONE;
 					return cancel();
@@ -1776,9 +1830,7 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 			return;
 		final StringBuilder buf = new StringBuilder();
 //		if (mActivity.isFullscreen()) {
-		SimpleDateFormat fmt = new SimpleDateFormat("HH:mm");
-		final String time = fmt.format(new Date());
-		buf.append(time + " ");
+		buf.append( Utils.formatTime(mActivity, System.currentTimeMillis()) +  " ");
 		if (mBatteryState>=0)
  			buf.append(" [" + mBatteryState + "%]\n");
 //		}
@@ -1794,11 +1846,33 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 					}
 					int percent = (int)(10000 * (long)prop.y / prop.fullHeight);
 					buf.append("" + (percent/100) + "." + (percent%100) + "%" );
-					String chapter = bm.getTitleText();
-					if (chapter!=null && chapter.length()>100)
-						chapter = chapter.substring(0, 100) + "...";
-					if (chapter != null && chapter.length() > 0)
-			 			buf.append("\n" + chapter);
+
+ 					// Show chapter details if book has more than one chapter
+ 					TOCItem toc = doc.getTOC();
+ 					if ( toc!=null && toc.getChildCount() > 1) {
+ 						TOCItem chapter = toc.getChapterAtPage(prop.pageNumber);
+ 
+ 						String chapterName = chapter.getName();
+ 						if (chapterName!=null && chapterName.length()>30)
+ 							chapterName = chapterName.substring(0, 30) + "...";
+ 
+ 						TOCItem nextChapter = chapter.getNextChapter();
+ 						int iChapterEnd = (nextChapter != null) ? nextChapter.getPage() : prop.pageCount;
+ 						
+ 						String chapterPos = null;
+ 						if ( prop.pageMode!=0 ) {
+ 							int iChapterStart = chapter.getPage();
+ 							int iChapterLen = iChapterEnd - iChapterStart;
+ 							int iChapterPage = prop.pageNumber - iChapterStart + 1;
+ 
+ 							chapterPos = "  (" + iChapterPage + " / " + iChapterLen + ")";
+ 						}
+ 						
+ 						if (chapterName != null && chapterName.length() > 0)
+ 				 			buf.append("\n" + chapterName);
+ 						if (chapterPos != null && chapterPos.length() > 0)
+ 							buf.append(chapterPos);
+ 					}
 				}
 			}
 			public void done() {
@@ -1897,7 +1971,7 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 		items.add("section=section.system");
 		items.add("system.version=Cool Reader " + mActivity.getVersion());
 		items.add("system.battery=" + mBatteryState + "%");
-		items.add("system.time=" + timeFormat.format(new Date()));
+		items.add("system.time=" + Utils.formatTime(mActivity, System.currentTimeMillis()));
 		final BookInfo bi = mBookInfo;
 		if ( bi!=null ) {
 			FileInfo fi = bi.getFileInfo();
@@ -2626,9 +2700,9 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 		final FileInfo fileInfo = mBookInfo.getFileInfo();
 		if (fileInfo == null)
 			return;
-		final Bookmark bmk = doc.getCurrentPageBookmark();
-		final PositionProperties props = doc.getPositionProps(bmk.getStartPos());
-		BackgroundThread.instance().postGUI(new Runnable() {
+		final Bookmark bmk = doc != null ? doc.getCurrentPageBookmark() : null;
+		final PositionProperties props = bmk != null ? doc.getPositionProps(bmk.getStartPos()) : null;
+		if (props != null) BackgroundThread.instance().postGUI(new Runnable() {
 			@Override
 			public void run() {
 				mActivity.updateCurrentPositionStatus(fileInfo, bmk, props);
@@ -4959,7 +5033,8 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 	    		pos = mBookInfo.getLastPosition().getStartPos();
 			log.v("LoadDocumentTask : book info " + mBookInfo);
 			log.v("LoadDocumentTask : last position = " + pos);
-			
+			if (mBookInfo != null && mBookInfo.getLastPosition() != null)
+			    setTimeElapsed(mBookInfo.getLastPosition().getTimeElapsed());			
     		//mBitmap = null;
 	        //showProgress(1000, R.string.progress_loading);
 	        //draw();
@@ -5028,7 +5103,7 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 			BackgroundThread.ensureGUI();
 			log.d("LoadDocumentTask, GUI thread is finished successfully");
 			if (Services.getHistory() != null) {
-				Services.getHistory().updateBookAccess(mBookInfo);
+				Services.getHistory().updateBookAccess(mBookInfo, getTimeElapsed());
 				if (mActivity.getDB() != null)
 					mActivity.getDB().saveBookInfo(mBookInfo);
 		        if (coverPageBytes!=null && mBookInfo!=null && mBookInfo.getFileInfo()!=null) {
@@ -5181,7 +5256,11 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 		@Override
 		public void draw(Canvas canvas) {
 			Rect dst = new Rect(0, 0, canvas.getWidth(), canvas.getHeight());
-			drawPageBackground(canvas, dst, location);
+			try {
+				drawPageBackground(canvas, dst, location);
+			} catch (Exception e) {
+				L.e("Exception in ToolbarBackgroundDrawable.draw", e);
+			}
 		}
 		@Override
 		public int getOpacity() {
@@ -5369,7 +5448,7 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 			    	if (delayMillis <= 1) {
 						if (bookInfo != null && mActivity.getDB() != null) {
 							log.v("saving last immediately");
-							Services.getHistory().updateBookAccess(bookInfo);
+							Services.getHistory().updateBookAccess(bookInfo, getTimeElapsed());
 							mActivity.getDB().saveBookInfo(bookInfo);
 							mActivity.getDB().flush();
 						}
@@ -5381,7 +5460,7 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 									if (bookInfo != null) {
 										log.v("saving last position");
 										if (Services.getHistory() != null) {
-											Services.getHistory().updateBookAccess(bookInfo);
+											Services.getHistory().updateBookAccess(bookInfo, getTimeElapsed());
 											if (mActivity.getDB() != null)
 												mActivity.getDB().saveBookInfo(bookInfo);
 										}
@@ -5451,7 +5530,7 @@ public class ReaderView extends SurfaceView implements android.view.SurfaceHolde
 		if (isBookLoaded() && mBookInfo != null) {
 			log.v("saving last immediately");
 			log.d("bookmark count 1 = " + mBookInfo.getBookmarkCount());
-			Services.getHistory().updateBookAccess(mBookInfo);
+			Services.getHistory().updateBookAccess(mBookInfo, getTimeElapsed());
 			log.d("bookmark count 2 = " + mBookInfo.getBookmarkCount());
 			mActivity.getDB().saveBookInfo(mBookInfo);
 			log.d("bookmark count 3 = " + mBookInfo.getBookmarkCount());
