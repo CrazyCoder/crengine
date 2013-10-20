@@ -29,6 +29,7 @@ public class DeviceInfo {
 	public final static boolean NAVIGATE_LEFTRIGHT; // map left/right keys to single page flip
 	public final static boolean REVERT_LANDSCAPE_VOLUME_KEYS; // revert volume keys in landscape mode
 	public final static android.graphics.Bitmap.Config BUFFER_COLOR_FORMAT;
+	public final static boolean USE_OPENGL = true;
 	public final static int PIXEL_FORMAT;
 	public final static String  DEF_FONT_FACE;
 	public final static boolean USE_BITMAP_MEMORY_HACK; // revert volume keys in landscape mode
@@ -39,6 +40,10 @@ public class DeviceInfo {
 	private static final String[] MIN_SCREEN_BRIGHTNESS_DB = {
 		"LGE;LG-P500",       "6", // LG Optimus One
 		"samsung;GT-I9003",  "6", // Samsung i9003
+		"Samsung;GT-I9000",  "1", // Samsung Galaxy S
+		"Samsung;GT-I9100",  "1", // Samsung Galaxy S2
+		"Samsung;GT-I9300",  "1", // Samsung Galaxy S3
+		"Samsung;GT-I9500",  "1", // Samsung Galaxy S4
 		"HTC;HTC EVO 3D*",   "1", // HTC EVO
 		"Archos;A70S",       "1", // Archos
 		"HTC;HTC Desire",    "6", // HTC Desire
@@ -114,7 +119,7 @@ public class DeviceInfo {
 		MIN_SCREEN_BRIGHTNESS_PERCENT = getMinBrightness(AMOLED_SCREEN ? 2 : (getSDKLevel() >= ICE_CREAM_SANDWICH ? 8 : 16));
 		//BUFFER_COLOR_FORMAT = getSDKLevel() >= HONEYCOMB ? android.graphics.Bitmap.Config.ARGB_8888 : android.graphics.Bitmap.Config.RGB_565;
 		//BUFFER_COLOR_FORMAT = android.graphics.Bitmap.Config.ARGB_8888;
-		BUFFER_COLOR_FORMAT = EINK_SCREEN || (getSDKLevel() >= ICE_CREAM_SANDWICH) ? android.graphics.Bitmap.Config.ARGB_8888 : android.graphics.Bitmap.Config.RGB_565;
+		BUFFER_COLOR_FORMAT = EINK_SCREEN || USE_OPENGL ? android.graphics.Bitmap.Config.ARGB_8888 : android.graphics.Bitmap.Config.RGB_565;
 		PIXEL_FORMAT = (DeviceInfo.BUFFER_COLOR_FORMAT == android.graphics.Bitmap.Config.RGB_565) ? PixelFormat.RGB_565 : PixelFormat.RGBA_8888;
 		
 		DEF_FONT_FACE = getSDKLevel() >= ICE_CREAM_SANDWICH ? "Roboto" : "Droid Sans";
